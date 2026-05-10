@@ -373,6 +373,7 @@
                         <h2 class="text-xl font-semibold flex items-center gap-2">
                             <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
                             Demand & Inventory Simulation
+                            <span class="ml-2 text-xs font-mono bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded border border-brand-500/30">FR-ALU-001</span>
                         </h2>
                         <div class="flex gap-2">
                             <span class="flex items-center gap-1.5 text-[10px] text-slate-400 uppercase tracking-tighter"><span class="w-2 h-2 rounded-full bg-brand-400"></span> Actual</span>
@@ -781,17 +782,45 @@
         // Chart implementation
         const ctx = document.getElementById('forecastChart').getContext('2d');
         const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan-F', 'Feb-F', 'Mar-F'];
-        const historical = [580, 620, 590, 610, 800, 550, 560, 590, 600, 420, 580, 595, null, null, null];
-        const forecast = [null, null, null, null, null, null, null, null, null, null, null, 595, 610, 630, 750];
         
+        // Historical vs Forecast Logic for FR-ALU-001
+        // Historical Demand (~600) | Forecast Demand (Spiking due to market trend)
+        const histDemand = [580, 620, 590, 610, 600, 550, 560, 590, 600, 620, 580, 595, null, null, null];
+        const foreDemand = [null, null, null, null, null, null, null, null, null, null, null, 595, 620, 680, 750];
+        
+        // Historical Inventory (~650 Buffer) | Forecast Inventory (Burns to 0 due to Region C export control)
+        const histInv = [650, 660, 640, 650, 630, 610, 620, 640, 650, 670, 630, 650, null, null, null];
+        const foreInv = [null, null, null, null, null, null, null, null, null, null, null, 650, 450, 150, 0];
+
         const chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Current Level',
-                        data: historical,
+                        label: 'Historical Demand',
+                        data: histDemand,
+                        borderColor: '#a855f7',
+                        backgroundColor: 'transparent',
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Forecast Demand',
+                        data: foreDemand,
+                        borderColor: '#a855f7',
+                        backgroundColor: 'transparent',
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Historical Inventory',
+                        data: histInv,
                         borderColor: '#0ea5e9',
                         backgroundColor: 'rgba(14, 165, 233, 0.1)',
                         fill: true,
@@ -800,24 +829,47 @@
                         pointRadius: 2
                     },
                     {
-                        label: 'Simulated Gap',
-                        data: forecast,
-                        borderColor: '#a855f7',
-                        borderDash: [5, 5],
+                        label: 'Forecast Inventory',
+                        data: foreInv,
+                        borderColor: '#0ea5e9',
                         backgroundColor: 'transparent',
+                        borderDash: [5, 5],
                         fill: false,
                         tension: 0.4,
-                        borderWidth: 2
+                        borderWidth: 2,
+                        pointRadius: 2
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { 
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            color: '#94a3b8',
+                            boxWidth: 12,
+                            font: { size: 10 },
+                            filter: function(item, chart) {
+                                // Keep legend clean by hiding historical labels, as color already implies the metric
+                                return !item.text.includes('Historical');
+                            }
+                        }
+                    } 
+                },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b' } },
-                    x: { grid: { display: false }, ticks: { color: '#64748b' } }
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
+                        ticks: { color: '#64748b', font: { size: 10 } } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#64748b', font: { size: 10 } } 
+                    }
                 }
             }
         });
@@ -938,7 +990,7 @@
         // setTimeout(toggleChat, 1000);
 
         // Mapbox Initialization
-        mapboxgl.accessToken = 'pk.eyJ1IjoiZWFzb254eHgiLCJhIjoiY21vemgwdjJiMG1iODJzc2o5MTYxb3B5cyJ9.x1_58CE2KwisaVmkh8tPLQ'; 
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZWFzb254eHgiLCJhIjoiY21vemwxbmI0MDB3cjJycXFzNTJsb2hzNSJ9.iAO7zQ4HWX-PoZTVcmtmMQ'; 
         
         const map = new mapboxgl.Map({
             container: 'map',
@@ -1014,3 +1066,4 @@
     </script>
 </body>
 </html>
+--- End of content ---
