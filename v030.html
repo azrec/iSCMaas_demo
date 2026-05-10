@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iSCMaaS TPrism | Intelligent Supply Chain War Room</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css' rel='stylesheet' />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                            950: '#082f49',
+                        },
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        success: '#10b981',
+                        intel: '#a855f7'
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains+Mono', 'monospace'],
+                    },
+                    backdropBlur: {
+                        xs: '2px',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+        }
+
+        .alert-pulse {
+            animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
+            50% { border-color: rgba(239, 68, 68, 1); }
+        }
+
+        .map-pulse {
+            animation: pulse-map 2s ease-out infinite;
+        }
+
+        @keyframes pulse-map {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 10px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+
+        .hero-gradient-overlay {
+            background: linear-gradient(to bottom, rgba(2, 6, 23, 0.4) 0%, rgba(2, 6, 23, 0.95) 100%);
+        }
+
+        .stat-card {
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(14, 165, 233, 0.4);
+        }
+
+        .event-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .event-card:hover {
+            background: rgba(168, 85, 247, 0.1);
+            border-color: rgba(168, 85, 247, 0.4);
+        }
+
+        /* Chat Panel Sidebar */
+        #chat-panel {
+            transform: translateX(100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+        }
+        #chat-panel.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
+        }
+
+        /* Planning Hub Modal */
+        #planning-modal {
+            transition: all 0.4s ease-in-out;
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            backdrop-filter: blur(0px);
+        }
+        #planning-modal.open {
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Planning Hub Modal Overlay -->
+    <div id="planning-modal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 md:p-8">
+        <div class="relative w-full max-w-[1200px] max-h-[90vh] overflow-y-auto custom-scrollbar glass-panel p-8 border-brand-500/30 shadow-[0_0_50px_rgba(14,165,233,0.2)]">
+            <!-- Close Button -->
+            <button onclick="togglePlanningHub()" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <!-- Smart Purchasing Assistant Content (Moved here) -->
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-12 h-12 rounded-full bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/30">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">AI Strategic Planning Hub</h2>
+                    <p class="text-slate-400 text-sm">Advanced Simulation & Multi-Objective Optimization Engine</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Left Column: Prompt & Decision -->
+                <div class="lg:col-span-5 space-y-6">
+                    <!-- LLM Prompt Input -->
+                    <div class="glass-panel p-6 border-t-4 border-t-brand-500 bg-white/5">
+                        <h3 class="text-lg font-bold text-white mb-4 uppercase tracking-widest text-sm">LLM Prompt Input</h3>
+                        <textarea id="smart-prompt" class="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-slate-300 focus:ring-2 focus:ring-brand-500 outline-none resize-none h-40" placeholder="Analyze current Hybrid RAG global reports and Supplier A warnings. Recalculate optimal order quantities for FR-ALU-001 and TB-ALU-7075. Provide LLM reasoning."></textarea>
+                        <div class="flex justify-end mt-4">
+                            <button id="btn-analyze" onclick="runSmartAnalysis()" class="py-3 px-8 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-brand-600/20">
+                                Run AI Analysis
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Decision Analysis -->
+                    <div id="smart-decision" class="glass-panel p-6 border-l-4 border-l-intel opacity-30 pointer-events-none transition-all duration-700 blur-sm bg-white/5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-white uppercase tracking-widest text-sm">Decision Analysis</h3>
+                            <span class="bg-intel/20 text-intel text-[10px] font-bold px-2 py-1 rounded uppercase">AI Generated</span>
+                        </div>
+                        <div class="space-y-4 text-sm text-slate-300" id="decision-text-container">
+                            <p class="italic text-slate-500">Awaiting system initialization...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Charts & Quantities -->
+                <div class="lg:col-span-7 space-y-6">
+                    <!-- Demand Forecast Model -->
+                    <div id="smart-forecast" class="glass-panel p-6 opacity-30 pointer-events-none transition-all duration-700 blur-sm bg-white/5">
+                        <h3 class="text-lg font-bold text-white mb-4 uppercase tracking-widest text-sm">Demand Forecast Model</h3>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-[10px] font-bold text-slate-400 mb-3 uppercase border-b border-white/5 pb-1">FR-ALU-001 (Monthly)</h4>
+                                <div class="h-[180px] relative">
+                                    <canvas id="chart-mat-a"></canvas>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-[10px] font-bold text-slate-400 mb-3 uppercase border-b border-white/5 pb-1">TB-ALU-7075 (Monthly)</h4>
+                                <div class="h-[180px] relative">
+                                    <canvas id="chart-mat-b"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Material Order Quantities -->
+                    <div id="smart-quantities" class="glass-panel p-6 border-b-4 border-b-success opacity-30 pointer-events-none transition-all duration-700 blur-sm bg-white/5">
+                        <h3 class="text-lg font-bold text-white mb-4 uppercase tracking-widest text-sm">Recommended Order Quantities</h3>
+                        <div class="grid grid-cols-2 gap-6 mb-6">
+                            <div class="bg-white/5 border border-white/10 p-5 rounded-lg">
+                                <h4 class="text-sm font-bold text-brand-400 mb-3">FR-ALU-001</h4>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex justify-between"><span class="text-slate-400">Recommended Order:</span><span class="text-white font-mono font-bold" id="qty-a">--</span></div>
+                                    <div class="flex justify-between"><span class="text-slate-400">Safety Stock Level:</span><span class="text-white font-mono">1,200 units</span></div>
+                                    <div class="flex justify-between"><span class="text-slate-400">Est. Total Cost:</span><span class="text-danger font-mono font-bold" id="cost-a">--</span></div>
+                                </div>
+                            </div>
+                            <div class="bg-white/5 border border-white/10 p-5 rounded-lg">
+                                <h4 class="text-sm font-bold text-intel mb-3">TB-ALU-7075</h4>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex justify-between"><span class="text-slate-400">Recommended Order:</span><span class="text-white font-mono font-bold" id="qty-b">--</span></div>
+                                    <div class="flex justify-between"><span class="text-slate-400">Safety Stock Level:</span><span class="text-white font-mono">5,000 meters</span></div>
+                                    <div class="flex justify-between"><span class="text-slate-400">Est. Total Cost:</span><span class="text-warning font-mono font-bold" id="cost-b">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-4 bg-success/10 border border-success/20 rounded-lg">
+                            <div>
+                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Total Procurement Batch</span>
+                                <span class="text-xl text-success font-bold font-mono"><span id="total-qty">--</span> Units</span>
+                            </div>
+                            <button class="px-8 py-3 bg-success hover:bg-success/80 text-slate-900 font-bold rounded-lg transition-all shadow-lg shadow-success/30">Execute Order</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification (Simulated Push) -->
+    <div id="push-toast" class="fixed top-8 right-8 z-[100] transform translate-x-[120%] transition-transform duration-500 ease-out">
+        <div class="glass-panel p-4 w-[320px] border-l-4 border-l-brand-500 bg-brand-950/90 shadow-2xl">
+            <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="flex h-2 w-2 rounded-full bg-brand-500 animate-ping"></span>
+                    <span class="text-[10px] font-bold text-brand-400 uppercase tracking-widest">System Intelligence</span>
+                </div>
+                <button onclick="dismissToast()" class="text-slate-500 hover:text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <h4 class="font-bold text-sm mb-1">New Market Event Detected</h4>
+            <p class="text-xs text-slate-300 mb-3">Region C Aluminum Export Control may impact FR-ALU-001 inventory.</p>
+            <button onclick="dismissToast()" class="w-full py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-[10px] font-bold rounded transition-all">Analyze Impact</button>
+        </div>
+    </div>
+
+    <!-- Header Section -->
+    <header class="relative w-full h-[250px] overflow-hidden">
+        <div class="absolute inset-0 z-0">
+            <img src='https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop' alt='Supply Chain Logistics' class="w-full h-full object-cover" />
+            <div class="absolute inset-0 hero-gradient-overlay"></div>
+        </div>
+        <div class="relative z-10 max-w-7xl mx-auto px-6 h-full flex flex-col justify-end pb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="bg-brand-500 text-xs font-bold px-2 py-1 rounded uppercase tracking-widest">TPrism AI</span>
+                <span class="text-slate-400 text-sm font-mono">WORKSPACE: SME-MFG-2026-X1</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold tracking-tight text-white mb-2">
+                iSCMaaS War Room <br>
+                <span class="text-brand-400">Intelligent Decision Support System</span>
+            </h1>
+        </div>
+    </header>
+
+    <main class="max-w-[1700px] mx-auto px-4 md:px-8 py-6 relative z-10">
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+            
+            <!-- Left: Risk Alert Center (Risk Feed) -->
+            <aside class="lg:col-span-3 flex flex-col gap-6">
+                <div class="flex items-center justify-between mb-2 px-2">
+                    <h2 class="text-xl font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Risk Alert Center
+                    </h2>
+                    <span class="text-xs text-danger animate-pulse bg-danger/10 px-2 py-1 rounded-full border border-danger/20 font-bold">3 CRITICAL</span>
+                </div>
+
+                <div class="space-y-4 overflow-y-auto max-h-[850px] custom-scrollbar pr-2">
+                    <!-- FR-ALU-001 Alert -->
+                    <div class="glass-panel p-4 border-l-4 border-l-danger alert-pulse">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-mono text-xs text-brand-400">FR-ALU-001</span>
+                            <span class="bg-danger/20 text-danger text-[10px] px-1.5 py-0.5 rounded font-bold">EXPORT CONTROL</span>
+                        </div>
+                        <h3 class="font-bold mb-1">Region C Export Restriction</h3>
+                        <p class="text-sm text-slate-300">Aluminum alloy frames facing 30-day clearance hold.</p>
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <span class="text-slate-400">Impact: <span class="text-danger">Production Stall</span></span>
+                        </div>
+                    </div>
+
+                    <!-- TB-ALU-7075 Alert -->
+                    <div class="glass-panel p-4 border-l-4 border-l-warning">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-mono text-xs text-brand-400">TB-ALU-7075</span>
+                            <span class="bg-warning/20 text-warning text-[10px] px-1.5 py-0.5 rounded font-bold">Z-SCORE 2.85</span>
+                        </div>
+                        <h3 class="font-bold mb-1">Price Spike Imminent</h3>
+                        <p class="text-sm text-slate-300">LME futures trend suggests +15% increase next week.</p>
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <span class="text-slate-400">Inventory: <span class="text-white">8 Days Remaining</span></span>
+                        </div>
+                    </div>
+
+                    <!-- WH-SH-29 Alert -->
+                    <div class="glass-panel p-4 border-l-4 border-l-danger">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="font-mono text-xs text-brand-400">WH-SH-29</span>
+                            <span class="bg-danger/20 text-danger text-[10px] px-1.5 py-0.5 rounded font-bold">LOGISTICS FAILURE</span>
+                        </div>
+                        <h3 class="font-bold mb-1">Port Congestion (Vietnam)</h3>
+                        <p class="text-sm text-slate-300">Expected lead time delay: +14 days due to strike.</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center: Interactive Map & Forecast -->
+            <main class="lg:col-span-6 space-y-6">
+                <!-- Interactive Map Section -->
+                <div class="glass-panel p-6 overflow-hidden relative group">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            Supply Chain Digital Twin
+                        </h2>
+                        <span class="text-xs text-slate-400 font-mono">Live Node Status: Active</span>
+                    </div>
+                    
+                    <!-- Mapbox Container -->
+                    <div class="relative w-full h-[350px] bg-slate-900/50 rounded-lg border border-white/5 overflow-hidden">
+                        <div id='map' class="w-full h-full"></div>
+                        
+                        <!-- Overlay Legend (Optional) -->
+                        <div class="absolute bottom-4 left-4 z-10 bg-slate-900/80 backdrop-blur-md p-2 rounded border border-white/10 text-[10px] text-slate-400">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="w-2 h-2 bg-danger rounded-full"></span> Critical Risk
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 bg-success rounded-full"></span> Stable Node
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dual-Engine Forecasting Panel -->
+                <div class="glass-panel p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                            Demand & Inventory Simulation
+                        </h2>
+                        <div class="flex gap-2">
+                            <span class="flex items-center gap-1.5 text-[10px] text-slate-400 uppercase tracking-tighter"><span class="w-2 h-2 rounded-full bg-brand-400"></span> Actual</span>
+                            <span class="flex items-center gap-1.5 text-[10px] text-slate-400 uppercase tracking-tighter"><span class="w-2 h-2 rounded-full bg-intel"></span> Simulation</span>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                        <div class="stat-card glass-panel p-3 bg-white/5 border-white/5">
+                            <p class="text-[10px] text-slate-400 uppercase font-bold">BOM Depth</p>
+                            <p class="text-xl font-bold font-mono">L3 (62)</p>
+                        </div>
+                        <div class="stat-card glass-panel p-3 bg-white/5 border-white/5">
+                            <p class="text-[10px] text-slate-400 uppercase font-bold">Gap Coverage</p>
+                            <p class="text-xl font-bold font-mono text-danger">-12.5%</p>
+                        </div>
+                        <div class="stat-card glass-panel p-3 bg-white/5 border-white/5">
+                            <p class="text-[10px] text-slate-400 uppercase font-bold">Alt Source Avail.</p>
+                            <p class="text-xl font-bold font-mono text-success">88.4%</p>
+                        </div>
+                        <div class="stat-card glass-panel p-3 bg-white/5 border-white/5">
+                            <p class="text-[10px] text-slate-400 uppercase font-bold">MPC Confidence</p>
+                            <p class="text-xl font-bold font-mono text-brand-400">0.94</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right: Intelligence & Futures -->
+            <aside class="lg:col-span-3 space-y-6">
+                <!-- Futures & Key Metrics Widget -->
+                <div class="glass-panel p-5 border-b-4 border-brand-500/30">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
+                        Market Ticker (24H)
+                        <span class="flex h-2 w-2 rounded-full bg-success"></span>
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-sm font-bold">LME Aluminum</p>
+                                <p class="text-[10px] text-slate-500 font-mono">USD/MT</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-mono text-danger">2,642.50</p>
+                                <p class="text-[10px] text-danger font-bold">+2.42%</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-sm font-bold">Steel Index (Cold Rolled)</p>
+                                <p class="text-[10px] text-slate-500 font-mono">CNY/MT</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-mono text-success">4,120.00</p>
+                                <p class="text-[10px] text-success font-bold">-0.15%</p>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-white/5">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Global Inventory Avg</span>
+                                <span class="text-warning">14.2 Days</span>
+                            </div>
+                            <div class="w-full bg-white/10 h-1 rounded-full overflow-hidden">
+                                <div class="bg-warning h-full w-[45%]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 mb-2 px-2 pt-4">
+                    <h2 class="text-xl font-semibold">Graph RAG Intel</h2>
+                    <span class="text-[10px] bg-intel/20 text-intel px-2 py-0.5 rounded-full font-bold border border-intel/30 uppercase">Neural Link</span>
+                </div>
+
+                <div class="space-y-4" id="attribution-container">
+                    <div class="event-card glass-panel p-5 border-l-4 border-l-intel relative group overflow-hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-8 h-8 rounded bg-intel/10 flex items-center justify-center text-intel">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            </div>
+                            <span class="text-xs font-bold text-intel uppercase tracking-widest">Regulatory Pivot</span>
+                        </div>
+                        <h4 class="font-bold text-lg mb-2">Region C: New Export Caps</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed mb-4">Implementation of environmental quotas on aluminum smelting causing 12% output drop.</p>
+                        <div class="pt-3 border-t border-white/5 space-y-2">
+                            <div class="flex justify-between text-xs">
+                                <span class="text-slate-500">Correlation</span>
+                                <span class="text-intel font-mono">FR-ALU-001 Lead Time</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="event-card glass-panel p-5 border-l-4 border-l-intel relative group overflow-hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-8 h-8 rounded bg-intel/10 flex items-center justify-center text-intel">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"></path></svg>
+                            </div>
+                            <span class="text-xs font-bold text-intel uppercase tracking-widest">Geopolitical Risk</span>
+                        </div>
+                        <h4 class="font-bold text-lg mb-2">Vietnam Port Strike</h4>
+                        <p class="text-sm text-slate-300 leading-relaxed mb-4">Unionized labor strike at Hai Phong Terminal affecting WH-SH-29 shipments.</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Procurement Advisor: Scenario Comparison -->
+        <section class="mt-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.364-6.364l-.707-.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M12 7a5 5 0 015 5 1.75 1.75 0 01-1.75 1.75 1.75 1.75 0 00-1.75 1.75 1.75 1.75 0 01-1.75 1.75 1.75 1.75 0 01-1.75-1.75 1.75 1.75 0 00-1.75-1.75 1.75 1.75 0 01-1.75-1.75 5 5 0 015-5z"></path></svg>
+                </div>
+                <h2 class="text-2xl font-bold">Procurement Advisor: AI Scenario Simulation</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Scenario 1: Status Quo -->
+                <div class="glass-panel p-6 border-l-4 border-l-slate-600 bg-white/5 opacity-80">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Scenario 01</span>
+                            <h3 class="text-xl font-bold text-slate-300">Maintain Status Quo</h3>
+                        </div>
+                        <span class="bg-danger/10 text-danger text-xs font-bold px-2 py-1 rounded border border-danger/20 uppercase">High Risk</span>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-400">Primary Supplier</span>
+                            <span class="text-white font-mono">Supplier A (Region C)</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-400">Estimated Delivery</span>
+                            <span class="text-danger font-bold">Delay +30 Days</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-400">Stockout Risk (FR-ALU-001)</span>
+                            <span class="text-danger font-bold">85%</span>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-lg text-xs text-slate-400 italic">
+                            "Continuance relies on single-source Region C, leading to assembly line stoppage by next month."
+                        </div>
+                    </div>
+                    <button class="w-full mt-6 py-2 border border-white/10 rounded-lg text-slate-500 font-bold hover:bg-white/5 transition-all">Dismiss Strategy</button>
+                </div>
+
+                <!-- Scenario 2: AI Recommended -->
+                <div class="glass-panel p-6 border-l-4 border-l-brand-500 bg-brand-500/5 relative overflow-hidden">
+                    <div class="absolute top-0 right-0">
+                        <div class="bg-brand-500 text-white text-[10px] font-bold px-4 py-1 rotate-45 translate-x-4 translate-y-2 uppercase shadow-lg">Recommended</div>
+                    </div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <span class="text-[10px] font-bold text-brand-400 uppercase tracking-widest">Scenario 02</span>
+                            <h3 class="text-xl font-bold text-white">Dynamic Source Pivot</h3>
+                        </div>
+                        <span class="bg-success/10 text-success text-xs font-bold px-2 py-1 rounded border border-success/20 uppercase">Resilient</span>
+                    </div>
+                    <div class="space-y-4">
+                        <!-- SKU_001 Action Box -->
+                        <div class="bg-brand-500/10 border border-brand-500/20 p-3 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-mono font-bold px-2 py-0.5 bg-brand-500 text-white rounded">FR-ALU-001</span>
+                                <span class="text-sm font-bold text-brand-400">AI Decision: Dual-Sourcing Pivot</span>
+                            </div>
+                            <p class="text-[12px] text-slate-300 leading-relaxed">
+                                Automated **Activation of dual-sourcing near-shore protocols**. System has synchronized lead-time projections for Middle Eastern corridors to <span class="text-warning font-bold">35 Days</span> to establish a dynamic safety buffer.
+                            </p>
+                        </div>
+
+                        <!-- SKU_002 Action Box -->
+                        <div class="bg-intel/10 border border-intel/20 p-3 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-mono font-bold px-2 py-0.5 bg-intel text-white rounded">TB-ALU-7075</span>
+                                <span class="text-sm font-bold text-intel">AI Decision: Route Diversification</span>
+                            </div>
+                            <p class="text-[12px] text-slate-300 leading-relaxed">
+                                Execute **Route Diversification**. Enforce split-shipment strategy: <span class="text-white font-bold">60% West Coast / 40% East Coast</span> to proactively mitigate congestion risks at single logistics nodes.
+                            </p>
+                        </div>
+
+                        <!-- Specific Action Quote -->
+                        <div class="p-3 bg-white/5 rounded-lg border border-white/10">
+                            <div class="flex items-center gap-2 mb-1">
+                                <svg class="w-4 h-4 text-warning" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"></path></svg>
+                                <span class="text-xs font-bold text-warning uppercase">Urgent Procurement Directive</span>
+                            </div>
+                            <p class="text-sm text-white font-bold italic">"Immediate reorder of 500 units (TB-ALU-7075) recommended due to projected 15% price surge next week."</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-6">
+                        <button class="flex-1 py-2 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-lg transition-all shadow-lg shadow-brand-600/20">Generate Purchase Order (Apply)</button>
+                        <button onclick="togglePlanningHub()" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg border border-brand-500/50 transition-all font-bold flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.364-6.364l-.707-.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M12 7a5 5 0 015 5 1.75 1.75 0 01-1.75 1.75 1.75 1.75 0 00-1.75 1.75 1.75 1.75 0 01-1.75 1.75 1.75 1.75 0 01-1.75-1.75 1.75 1.75 0 00-1.75-1.75 1.75 1.75 0 01-1.75-1.75 5 5 0 015-5z"></path></svg>
+                            Open Planning Hub
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Material BOM Distribution Matrix -->
+        <section class="mt-8 mb-12">
+            <div class="glass-panel p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-widest">Manufacturing BOM Status Matrix</h3>
+                    <div class="relative group z-30">
+                        <input id="bom-search" type="text" placeholder="Search Part ID or Description..." 
+                               class="bg-slate-900 border border-white/20 text-slate-200 text-xs rounded-lg focus:ring-2 focus:ring-brand-500 block w-64 pl-4 p-2 outline-none cursor-text relative z-40">
+                    </div>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left" id="bom-table">
+                        <thead>
+                            <tr class="text-xs text-slate-500 border-b border-slate-800">
+                                <th class="pb-3 px-2">PART ID</th>
+                                <th class="pb-3 px-2">DESCRIPTION</th>
+                                <th class="pb-3 px-2">HEALTH STATUS</th>
+                                <th class="pb-3 px-2">ALT SOURCE</th>
+                                <th class="pb-3 px-2">RISK SCORE</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm">
+                            <tr class="border-b border-slate-800/50 hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-2 font-mono text-brand-400">FR-ALU-001</td>
+                                <td class="py-4 px-2">Alloy Frame Set</td>
+                                <td class="py-4 px-2">
+                                    <span class="px-2 py-0.5 rounded-full bg-danger/10 text-danger text-[10px] border border-danger/20">High Volatility</span>
+                                </td>
+                                <td class="py-4 px-2 text-success font-bold">Available (3)</td>
+                                <td class="py-4 px-2 font-mono text-danger">9.4/10</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/50 hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-2 font-mono text-brand-400">TB-ALU-7075</td>
+                                <td class="py-4 px-2">7075 Aero Tube</td>
+                                <td class="py-4 px-2">
+                                    <span class="px-2 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] border border-warning/20">Long Lead Time</span>
+                                </td>
+                                <td class="py-4 px-2 text-warning">Limited (1)</td>
+                                <td class="py-4 px-2 font-mono text-warning">6.2/10</td>
+                            </tr>
+                            <tr class="border-b border-slate-800/50 hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-2 font-mono text-brand-400">WH-SH-29</td>
+                                <td class="py-4 px-2">29" Wheel Set</td>
+                                <td class="py-4 px-2">
+                                    <span class="px-2 py-0.5 rounded-full bg-danger/10 text-danger text-[10px] border border-danger/20">Logistics Failure</span>
+                                </td>
+                                <td class="py-4 px-2 text-brand-400 font-bold">Available (2)</td>
+                                <td class="py-4 px-2 font-mono text-danger">8.8/10</td>
+                            </tr>
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-2 font-mono text-brand-400">DR-SY-12</td>
+                                <td class="py-4 px-2">12-Speed Derailleur</td>
+                                <td class="py-4 px-2">
+                                    <span class="px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px] border border-success/20">Healthy</span>
+                                </td>
+                                <td class="py-4 px-2 text-slate-500 italic">None Req.</td>
+                                <td class="py-4 px-2 font-mono text-success">1.2/10</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- AI Bot Floating Assistant & Chat Panel -->
+    <div class="fixed bottom-8 right-8 z-[100] flex flex-col items-end pointer-events-none">
+        <!-- Chat Panel Sidebar -->
+        <div id="chat-panel" class="mb-4 w-[350px] md:w-[450px] h-[550px] glass-panel border-brand-500/30 flex flex-col shadow-2xl shadow-black transition-all duration-300">
+            <!-- Chat Header -->
+            <div class="p-4 border-b border-white/10 flex items-center justify-between bg-brand-500/10 rounded-t-2xl">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                    <span class="font-bold text-sm">TPrism Intelligent Assistant</span>
+                </div>
+                <button onclick="toggleChat()" class="text-slate-400 hover:text-white pointer-events-auto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Chat Body -->
+            <div id="chat-body" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-900/40 pointer-events-auto">
+                <div class="flex flex-col items-start">
+                    <div class="bg-white/5 border border-white/10 p-3 rounded-2xl rounded-tl-none max-w-[85%]">
+                        <p class="text-sm text-slate-300">I am your Supply Chain Risk Analysis Consultant. I have prepared an analysis of current material risks. You can ask: "What are the risks for aluminum supply?" or "Suggest procurement strategies."</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="p-4 border-t border-white/10 bg-slate-900/60 rounded-b-2xl pointer-events-auto">
+                <div class="relative">
+                    <input id="chat-input" type="text" placeholder="Enter command (e.g., analyze next month's gap)..." class="w-full bg-white/5 border border-white/10 text-sm rounded-lg py-2 pl-3 pr-10 focus:ring-1 focus:ring-brand-500 outline-none">
+                    <button onclick="handleChatSend()" class="absolute right-2 top-1.5 text-brand-500 hover:text-brand-400">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Button -->
+        <button onclick="toggleChat()" class="bg-brand-500 hover:bg-brand-400 text-white p-4 rounded-full shadow-2xl shadow-brand-500/50 transition-all duration-300 hover:scale-110 group relative flex items-center justify-center pointer-events-auto">
+            <span class="absolute inset-0 rounded-full bg-brand-500 animate-ping opacity-20"></span>
+            <svg class="w-8 h-8 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <script>
+        // Toast Management
+        setTimeout(() => {
+            const toast = document.getElementById('push-toast');
+            toast.style.transform = 'translateX(0)';
+        }, 2000);
+
+        function dismissToast() {
+            const toast = document.getElementById('push-toast');
+            toast.style.transform = 'translateX(120%)';
+        }
+
+        // Toggle Chat Panel
+        function toggleChat() {
+            const panel = document.getElementById('chat-panel');
+            panel.classList.toggle('open');
+        }
+
+        // Chat Interaction Simulation
+        const chatInput = document.getElementById('chat-input');
+        const chatBody = document.getElementById('chat-body');
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleChatSend();
+        });
+
+        function handleChatSend() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            // User Message
+            addChatMessage(text, 'user');
+            chatInput.value = '';
+
+            // AI Simulated Typing
+            const typingId = 'typing-' + Date.now();
+            addChatMessage('...', 'ai', typingId);
+
+            setTimeout(() => {
+                document.getElementById(typingId).remove();
+                
+                // Predefined Logic for Demo
+                let aiResponse = "Based on my analysis, there are significant risks in the current aluminum supply chain.";
+                if (text.toLowerCase().includes('strategy') || text.toLowerCase().includes('procure') || text.toLowerCase().includes('analyze')) {
+                    aiResponse = `
+                        <div class="bg-brand-500/10 border border-brand-500/20 p-4 rounded-2xl w-full">
+                            <h4 class="text-xs font-bold text-brand-400 mb-2 uppercase tracking-widest">AI Decision Analysis Result</h4>
+                            <p class="text-sm text-slate-200 mb-3">Detected Region C export controls and extreme LME futures price volatility.</p>
+                            <div class="text-[10px] space-y-2 mb-4">
+                                <div class="grid grid-cols-2 gap-2 border-b border-white/5 pb-2">
+                                    <span class="text-slate-500">Projected Increase</span>
+                                    <span class="text-danger font-bold">+15% (Next Week)</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 border-b border-white/5 pb-2">
+                                    <span class="text-slate-500">Recommended Action</span>
+                                    <span class="text-success font-bold">Immediate order: 500 units</span>
+                                </div>
+                            </div>
+                            <p class="text-xs text-brand-300 font-bold italic">"Immediate reorder of 500 units recommended due to projected 15% price surge next week."</p>
+                        </div>
+                    `;
+                }
+                addChatMessage(aiResponse, 'ai');
+            }, 1500);
+        }
+
+        function addChatMessage(content, sender, id = null) {
+            const div = document.createElement('div');
+            div.className = `flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'}`;
+            if (id) div.id = id;
+
+            const inner = document.createElement('div');
+            inner.className = sender === 'user' 
+                ? 'bg-brand-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[85%] text-sm'
+                : 'bg-white/5 border border-white/10 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm text-slate-300';
+            
+            inner.innerHTML = content;
+            div.appendChild(inner);
+            chatBody.appendChild(div);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        // Chart implementation
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan-F', 'Feb-F', 'Mar-F'];
+        const historical = [580, 620, 590, 610, 800, 550, 560, 590, 600, 420, 580, 595, null, null, null];
+        const forecast = [null, null, null, null, null, null, null, null, null, null, null, 595, 610, 630, 750];
+        
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Current Level',
+                        data: historical,
+                        borderColor: '#0ea5e9',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Simulated Gap',
+                        data: forecast,
+                        borderColor: '#a855f7',
+                        borderDash: [5, 5],
+                        backgroundColor: 'transparent',
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b' } },
+                    x: { grid: { display: false }, ticks: { color: '#64748b' } }
+                }
+            }
+        });
+
+        // BOM Search Filtering
+        const bomSearch = document.getElementById('bom-search');
+        const bomTable = document.getElementById('bom-table');
+        const bomRows = bomTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+        bomSearch.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            Array.from(bomRows).forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+
+        // Planning Hub Modal Toggle
+        function togglePlanningHub() {
+            const modal = document.getElementById('planning-modal');
+            modal.classList.toggle('open');
+        }
+
+        // Smart Purchasing Assistant Logic
+        let matAChart, matBChart;
+
+        function runSmartAnalysis() {
+            const btn = document.getElementById('btn-analyze');
+            btn.innerText = "Analyzing RAG Reports...";
+            btn.disabled = true;
+
+            // Simulate delay
+            setTimeout(() => {
+                // Reveal panels
+                const panels = ['smart-decision', 'smart-forecast', 'smart-quantities'];
+                panels.forEach(id => {
+                    const el = document.getElementById(id);
+                    el.classList.remove('opacity-30', 'pointer-events-none', 'blur-sm');
+                    el.classList.add('opacity-100', 'pointer-events-auto');
+                });
+
+                // Populate Decision Analysis
+                document.getElementById('decision-text-container').innerHTML = `
+                    <div class="flex flex-col gap-3">
+                        <p class="text-slate-300 leading-relaxed">
+                            <span class="text-intel font-bold">LLM Analysis:</span> Based on Hybrid RAG global market intelligence, the aluminum alloy market is entering a phase of extreme volatility due to Region C export quotas. Supplier A risk scores have crossed the critical threshold.
+                        </p>
+                        <div class="p-3 bg-brand-500/10 rounded-lg border border-brand-500/20">
+                            <span class="text-brand-400 font-bold block mb-1">Decision:</span>
+                            <p class="text-xs text-slate-200">To mitigate 85% stockout risk, the system recommends an aggressive procurement strategy. Buffer for FR-ALU-001 increased to 45 days. Forward-purchase initiated for TB-ALU-7075 to lock in current pricing before the expected 15% surge.</p>
+                        </div>
+                    </div>
+                `;
+
+                // Update Quantities
+                document.getElementById('qty-a').innerText = "32,500 units";
+                document.getElementById('cost-a').innerText = "$85,800.00";
+                document.getElementById('qty-b').innerText = "21,000 units";
+                document.getElementById('cost-b').innerText = "$42,000.00";
+                document.getElementById('total-qty').innerText = "53,500";
+
+                // Initialize Charts
+                initSmartCharts();
+
+                btn.innerText = "Analysis Complete";
+                btn.classList.replace('bg-brand-600', 'bg-success');
+                btn.classList.replace('hover:bg-brand-500', 'hover:bg-success/80');
+            }, 1800);
+        }
+
+        function initSmartCharts() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { display: false } },
+                    x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 9 } } }
+                }
+            };
+
+            const labels = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            // Material A Chart
+            if(matAChart) matAChart.destroy();
+            const ctxA = document.getElementById('chart-mat-a').getContext('2d');
+            matAChart = new Chart(ctxA, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Historical', data: [2200, 2400, 2100, 2500, 2800, 3000], backgroundColor: '#0ea5e9', borderRadius: 4 },
+                        { label: 'Forecast', data: [null, null, null, null, null, 3500], backgroundColor: '#a855f7', borderRadius: 4 },
+                        { label: 'Rec. Order', data: [null, null, null, null, null, 3200], backgroundColor: '#10b981', borderRadius: 4 }
+                    ]
+                },
+                options: commonOptions
+            });
+
+            // Material B Chart
+            if(matBChart) matBChart.destroy();
+            const ctxB = document.getElementById('chart-mat-b').getContext('2d');
+            matBChart = new Chart(ctxB, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Historical', data: [450, 480, 520, 500, 550, 600], backgroundColor: '#0ea5e9', borderRadius: 4 },
+                        { label: 'Forecast', data: [null, null, null, null, null, 750], backgroundColor: '#a855f7', borderRadius: 4 },
+                        { label: 'Rec. Order', data: [null, null, null, null, null, 700], backgroundColor: '#10b981', borderRadius: 4 }
+                    ]
+                },
+                options: commonOptions
+            });
+        }
+
+        // Toggle chat panel on start for visibility in demo
+        // setTimeout(toggleChat, 1000);
+
+        // Mapbox Initialization
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZWFzb254eHgiLCJhIjoiY21vemgwdjJiMG1iODJzc2o5MTYxb3B5cyJ9.x1_58CE2KwisaVmkh8tPLQ'; 
+        
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11', // War Room dark theme
+            center: [115, 18], // Asia focus
+            zoom: 2.2,
+            projection: 'globe'
+        });
+
+        map.on('style.load', () => {
+            map.setFog({
+                color: 'rgb(15, 23, 42)',
+                'high-color': 'rgb(2, 6, 23)',
+                'horizon-blend': 0.02,
+                'space-color': 'rgb(2, 6, 23)',
+                'star-intensity': 0.15
+            });
+        });
+
+        // FR-ALU-001 Marker (Region C / Export Control)
+        const elFR = document.createElement('div');
+        elFR.className = 'relative flex items-center justify-center';
+        elFR.innerHTML = `
+            <div class="absolute w-12 h-12 bg-danger/40 rounded-full map-pulse"></div>
+            <div class="w-4 h-4 bg-danger rounded-full border-2 border-white/20 shadow-[0_0_15px_rgba(239,68,68,0.8)]"></div>
+        `;
+        new mapboxgl.Marker(elFR)
+            .setLngLat([114.1772, 22.3027]) // Region C
+            .setPopup(new mapboxgl.Popup({ offset: 25 })
+            .setHTML('<h4 class="text-slate-900 font-bold">FR-ALU-001 (Region C)</h4><p class="text-slate-600 text-xs">Export Control Active<br><span class="text-danger font-bold">Impact: Production Stall</span></p>'))
+            .addTo(map);
+
+        // WH-SH-29 Marker (Vietnam / Port Strike)
+        const elWH = document.createElement('div');
+        elWH.className = 'relative flex items-center justify-center';
+        elWH.innerHTML = `
+            <div class="absolute w-10 h-10 bg-danger/40 rounded-full map-pulse" style="animation-delay: 0.5s;"></div>
+            <div class="w-3.5 h-3.5 bg-danger rounded-full border-2 border-white/20 shadow-[0_0_15px_rgba(239,68,68,0.8)]"></div>
+        `;
+        new mapboxgl.Marker(elWH)
+            .setLngLat([106.6297, 10.8231]) // Vietnam
+            .setPopup(new mapboxgl.Popup({ offset: 25 })
+            .setHTML('<h4 class="text-slate-900 font-bold">WH-SH-29 (Vietnam)</h4><p class="text-slate-600 text-xs">Port Congestion (Strike)<br><span class="text-danger font-bold">Delay: +14 Days</span></p>'))
+            .addTo(map);
+
+        // TB-ALU-7075 Marker (Warning / Price Spike)
+        const elTB = document.createElement('div');
+        elTB.className = 'relative flex items-center justify-center';
+        elTB.innerHTML = `
+            <div class="absolute w-10 h-10 bg-warning/40 rounded-full map-pulse" style="animation-delay: 1s;"></div>
+            <div class="w-3.5 h-3.5 bg-warning rounded-full border-2 border-white/20 shadow-[0_0_15px_rgba(245,158,11,0.8)]"></div>
+        `;
+        new mapboxgl.Marker(elTB)
+            .setLngLat([121.5654, 25.0330]) // Taiwan area
+            .setPopup(new mapboxgl.Popup({ offset: 25 })
+            .setHTML('<h4 class="text-slate-900 font-bold">TB-ALU-7075</h4><p class="text-slate-600 text-xs">Price Spike Imminent<br><span class="text-warning font-bold">Inventory: 8 Days</span></p>'))
+            .addTo(map);
+
+        // Add some stable markers
+        const stableNodes = [
+            { coords: [-122.4194, 37.7749], name: 'Node NA: Logistics Hub' },
+            { coords: [139.6503, 35.6762], name: 'Node JP: Precision Parts' }
+        ];
+
+        stableNodes.forEach(node => {
+            const sel = document.createElement('div');
+            sel.className = 'w-2 h-2 bg-success rounded-full border border-white/20';
+            new mapboxgl.Marker(sel)
+                .setLngLat(node.coords)
+                .setPopup(new mapboxgl.Popup({ offset: 15 }).setHTML(`<p class="text-slate-900 text-[10px] font-bold">${node.name}</p>`))
+                .addTo(map);
+        });
+    </script>
+</body>
+</html>
